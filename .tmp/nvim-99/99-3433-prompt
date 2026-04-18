@@ -1,0 +1,33 @@
+Apply a "fill in the middle" change to the file below. Keep surrounding context unchanged; only modify the specified snippet.
+
+<file>.tmp/nvim-99//99-99-agent-6</file>
+<merge_setup>
+This is a 3-way merge setup. You are editing a COPY of the file, not the original.
+- ACTUAL_FILE: /home/nova/Programming/TimeTracer/src/timetracer/timetracer.py (the file you are reasoning about - imports, types, etc.)
+- AGENT_FILE: .tmp/nvim-99//99-99-agent-6 (your working copy - edit THIS FILE using your edit tool)
+- BASE_FILE: .tmp/nvim-99//99-99-base-6 (original snapshot, do not edit)
+
+Both ACTUAL_FILE and AGENT_FILE contain the same code - they are identical copies.
+The only difference is their location. Use ACTUAL_FILE when using read/bash tools to understand
+imports, types, and project structure. ALWAYS use AGENT_FILE when making edits with the edit tool.
+The merge system will combine your changes in AGENT_FILE with any changes you've made
+to ACTUAL_FILE, so you can safely work on other parts of the codebase while I edit.
+</merge_setup>
+
+
+<snippet_to_replace lines="69-69">
+            print("WARNING: Calling .end() inside context manager may produces unexpected timing")
+</snippet_to_replace>
+
+<instruction>
+improve warning message
+</instruction>
+
+<edit_strategy>
+- The edit tool REPLACES oldText with newText. oldText is deleted, newText takes its place.
+- Execute edits as needed. Do NOT repeat the same edit after it succeeds.
+- Choose oldText to be UNIQUE and EXACTLY match the file content including whitespace.
+- Merge all related changes into a single edit.
+- Preserve exact indentation and formatting.
+- After executing, re-read to verify. If verification shows the edit succeeded, STOP.
+</edit_strategy>

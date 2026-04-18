@@ -1,0 +1,15 @@
+[project]
+name = "timingtracer"
+version = "0.1.0"
+description = "A simple utility class for timing and tracing code execution. Mark operations and print elapsed times between them."
+keywords = ["timer", "performance", "debugging", "tracing", "profiling"]
+readme = "README.md"
+authors = [
+    { name = "NovaH00", email = "trantay2006super@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
