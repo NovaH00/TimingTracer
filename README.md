@@ -34,19 +34,11 @@ Output: `[MyModule] - fetch data took 10.5ms`
 ```python
 from timingtracer import TimeTracer
 
-with TimeTracer("MyModule", "fetch data"):
+with TimeTracer("MyModule"):
+    tt.start("fetch data")
     # ... code to measure ...
-    pass
+    tt.end()
 ```
-
-Or with method chaining:
-```python
-with TimeTracer("MyModule").operation("fetch data"):
-    # ... code to measure ...
-    pass
-```
-
-Output: `[MyModule] - fetch data took 10.5ms`
 
 ### Get elapsed time
 
@@ -62,7 +54,6 @@ print(f"It took {elapsed:.3f}s")
 ## API
 
 - `TimeTracer(tracer="TimeTracer")` - Create a tracer with a name for your module
-- `tt.start(operation_name)` - Start timing an operation
+- `tt.start(operation_name)` - Start timing an operation (default: "Operation")
 - `tt.end()` - Stop timing and print elapsed time
 - `tt.elapsed` - Get elapsed time in seconds (after calling end())
-- `tt.operation(name)` - Set operation name for context manager chaining

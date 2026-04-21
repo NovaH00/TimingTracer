@@ -7,21 +7,17 @@ class TimeTracer:
 
     Usage::
 
-        # Method 1: start/end
+        # Bare usage
         tt = TimeTracer("MyModule")
         tt.start("fetch data")
         # ... code to measure ...
         tt.end()
 
-        # Method 2: context manager (recommended)
-        with TimeTracer("MyModule", "fetch data"):
+        # Context manager
+        with TimeTracer("MyModule") as tt:
+            tt.start("fetch data")
             # ... code to measure ...
-            pass
-
-        # Or with method chaining
-        with TimeTracer("MyModule").operation("fetch data"):
-            # ... code to measure ...
-            pass
+            tt.end()
     """
 
     def __init__(self, tracer: str = "TimeTracer"):
