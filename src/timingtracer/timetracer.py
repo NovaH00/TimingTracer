@@ -1,110 +1,130 @@
 from __future__ import annotations
-from typing import Self
 import time
+from dataclasses import dataclass
+from typing import TypeAlias
 
-type TraceName = str
-type TimeStamp = int | float
-type DeltaTime = int | float
+TraceName: TypeAlias = str
+TimeStamp: TypeAlias = float
+DeltaTime: TypeAlias = float
+
+@dataclass
+class _TracerState:
+    name: str
+    traces: list[tuple[TraceName, DeltaTime]]
+    last_timestamp: TimeStamp
 
 class TimeTracer:
-    """A utility class for timing and tracing code execution.
+    """A time tracer that allows measuring and printing deltas between operations.
 
-    Provides methods to start a timer, mark operations, and print
-    elapsed times. Supports usage as a context manager.
+    Usage::
+
+        with TimeTracer().build().start() as tracer:
+            tracer.mark("first operation")
+            tracer.mark("second operation")
+            tracer.end()
     """
 
-    def __init__(self, name: str = "Time Tracer", *, disable: bool = False):
-        """Initialize the TimeTracer.
+    def __init__(self, name: str = "Time Tracer"):
+        """Initialize the TimeTracer with a display name.
 
         Args:
-            name: Display name shown in trace output. Defaults to "Time Tracer".
-            disable: If True, disables all methods rendering them as no-op. This is particularly useful for two scenarios:
-                1. *Debugging* — toggle on/off verbose tracing without removing calls.
-                2. *Production* — disable logging entirely to avoid overhead in performance-sensitive environments.
+            name: The name shown in trace output.
         """
+        self._name = name
 
-        if disable:
-            for name in dir(self):
-                if name.startswith("_"):
-                    continue
+    def build(self) -> IdleTracer:
+        """Build and return an IdleTracer ready for use.
 
-                attr = getattr(self, name)
-                noop = lambda *_arg, **_kwargs: None
-                if callable(attr):
-                    setattr(self, name, noop)
-
-        self._tracer_name = name
-        self._is_inside_ctx_manager = False
-
-    def _print_trace(self, name: TraceName, exec_time_second: DeltaTime) -> None:
-        """Print a formatted trace message with the operation name and elapsed time."""
-        fmt = f"{exec_time_second:.3f}s"  
-        if exec_time_second < 1e-3:
-            fmt = f"{exec_time_second*1e6:.1f}µs"
-        elif exec_time_second < 1:
-            fmt =  f"{exec_time_second*1e3:.2f}ms"
-
-        print(f"[{self._tracer_name}] - {name} took {fmt}") 
-
-    def start(self) -> None:
-        """Start the timer and clear any previous traces.
-
-        Call this before marking operations. Resets the internal trace list
-        and records the start timestamp.
+        Returns:
+            An IdleTracer instance configured with this tracer's name.
         """
-        if self._is_inside_ctx_manager:
-            print("WARNING: Calling .start() inside a context manager may produce unexpected timing. Use .mark() instead.")
+        return IdleTracer(_TracerState(self._name, [], 0.0))
 
-        self._start_timestamp = time.perf_counter()
-        self._traces: list[tuple[TraceName, TimeStamp]] = []
+class IdleTracer:
+    """An idle tracer that can only be started.
 
-    def mark(self, operation: str = "Operation"):
-        """Record a timestamp for the given operation name.
+    Represents a tracer in its initial, idle state. It does not yet
+    record any data — the first action is to call start() (or use
+    it as a context manager) to transition into StartedTracer.
+    """
 
-        Only records if the tracer has been started. If not yet started,
-        prints a warning instead.
+    def __init__(self, state: _TracerState):
+        """Initialize the idle tracer with the given internal state.
 
         Args:
-            operation_name: Label for this trace point.
+            state: The shared _TracerState object used by all tracer variants.
         """
-        if hasattr(self, "_traces"): 
-            self._traces.append((operation, time.perf_counter()))
+        self._state = state
+
+    def start(self) -> StartedTracer:
+        """Start tracing.
+
+        Records the current timestamp and clears any previous traces,
+        transitioning this idle tracer into a started state.
+
+        Returns:
+            A StartedTracer instance for marking, resetting, and ending.
+        """
+        self._state.last_timestamp = time.perf_counter()
+        self._state.traces.clear()
+        return StartedTracer(self._state)
+
+    def __enter__(self) -> StartedTracer:
+        """Context manager entry — starts tracing.
+
+        Returns:
+            A StartedTracer instance.
+        """
+        return self.start()
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Context manager exit — no-op (tracing continues until explicitly ended)."""
+        pass
+
+class StartedTracer:
+    """A tracer that has been started and can be used to mark operations.
+
+    Provides methods to record timing marks, reset the timer, end tracing,
+    and use as a context manager.
+    """
+    def __init__(self, state: _TracerState):
+        self._state = state
+        """Initialize with the tracer's internal state."""
+
+    def _print_trace(self, name: TraceName, dt: DeltaTime) -> None:
+        """Print a formatted trace line showing the operation name and elapsed time."""
+        if dt < 1e-3:
+            fmt = f"{dt * 1e6:.1f}µs"
+        elif dt < 1:
+            fmt = f"{dt * 1e3:.2f}ms"
         else:
-            print("WARNING: Calling .mark() before starting the tracer — trace will not be recorded. Use .start() first.")
+            fmt = f"{dt:.3f}s"
+
+        print(f"[{self._state.name}] - {name} took {fmt}")
+
+    def mark(self, operation: str = "Operation") -> None:
+        """Record a timing mark for the given operation name.
+
+        Records the elapsed time since the last mark (or since start) and
+        updates the internal timestamp so subsequent marks are measured from now.
+        """
+        now = time.perf_counter()
+        delta = now - self._state.last_timestamp
+        self._state.traces.append((operation, delta))
+        self._state.last_timestamp = now
+
+    def reset(self) -> None:
+        """Reset the internal timestamp so the next mark measures from this point."""
 
     def end(self) -> None:
-        """Print all recorded traces and compute elapsed times.
+        """Print all recorded trace entries and stop tracing."""
+        for name, dt in self._state.traces:
+            self._print_trace(name, dt)
 
-        Iterates through the stored trace points, calculates the delta
-        from each point to the previous one (including the initial start),
-        and prints a formatted summary. Resets nothing — call ``start()``
-        again to begin a fresh trace session.
-        """
-        if self._is_inside_ctx_manager:
-            print("WARNING: Calling .end() inside a context manager may produce unexpected timing results")
-
-        if not hasattr(self, "_traces"): 
-            return
-
-        # __start__ trace
-        prev_trace_timestamp = self._start_timestamp 
-         
-        for trace in self._traces:
-            curr_trace_name, curr_trace_timestamp = trace
-            delta_time = curr_trace_timestamp - prev_trace_timestamp
-            self._print_trace(curr_trace_name, delta_time)
-
-            prev_trace_timestamp = curr_trace_timestamp
-
-    def __enter__(self) -> Self:
-        """Enter the context manager: start the timer."""
-        self.start()
-        self._is_inside_ctx_manager = True
-
+    def __enter__(self) -> StartedTracer:
+        """Return self for use as a context manager."""
         return self
 
-    def __exit__(self, _exc_type, _exc_value, _traceback):
-        """Exit the context manager: stop timing and print traces."""
-        self._is_inside_ctx_manager = False
+    def __exit__(self, _exc_type, _exc, _tb) -> None:
+        """Context manager exit — ends tracing by printing all recorded traces."""
         self.end()
-        return True 
